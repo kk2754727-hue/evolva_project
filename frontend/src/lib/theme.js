@@ -1,0 +1,16 @@
+export const C = {
+  bg: "#0a0e17",
+  panel: "#0e1421",
+  card: "#131a29",
+  cardAlt: "#161e30",
+  border: "#212a3d",
+  text: "#e7ebf3",
+  muted: "#8b93a7",
+  blue: "#5865f2",
+  blue2: "#4f6df5",
+  green: "#14c88e",
+  amber: "#f2a93b",
+  red: "#f2596b",
+  purple: "#9b6bf7",
+  grad: "linear-gradient(135deg,#5865f2 0%,#8b6bf7 55%,#14c88e 100%)",
+};
