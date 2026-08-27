@@ -2,9 +2,12 @@
 Evolva backend API.
 
 Combines:
-- Interview answer scoring (reuses the real GeminiEvaluator from the
-  Mock_interview project's ai/gemini_evaluator.py)
-- Resume analysis (PDF/DOCX text extraction + Gemini scoring)
+- Interview answer scoring (LLM-based, via a local Ollama model - no
+  cloud API, no API key)
+- Resume analysis (PDF/DOCX text extraction + local LLM scoring)
+- Skill gap analysis (local LLM compares current skills to a target role)
+- Course recommendations, GFG-style course content generation, and
+  graded assessments with rewards - all via the local LLM
 - Camera-based analysis (eye contact, head pose, body language) - reuses
   the real mediapipe-based detectors from Mock_interview's
   computer_vision/ package, adapted to score individual frames sent from
@@ -13,9 +16,13 @@ Combines:
   reuses the logic from Mock_interview's speech_analysis/ module, fed by
   a transcript the browser produces via the Web Speech API instead of
   the original offline Whisper pipeline
+
+All AI features run through ai/llm_evaluator.py -> ai/ollama_client.py,
+which talks to a locally-running Ollama server (http://localhost:11434
+by default). Nothing in this file makes an external network call for AI
+inference.
 """
 
-import os
 import base64
 
 import cv2
@@ -23,7 +30,7 @@ import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from ai.gemini_evaluator import GeminiEvaluator, GeminiNotConfiguredError
+from ai.llm_evaluator import LLMEvaluator, OllamaNotAvailableError
 from resume.extractor import extract_text, UnsupportedFileTypeError
 from computer_vision.computerVisionEngine import ComputerVisionEngine
 from speech.analysis import analyze_speech
@@ -31,7 +38,7 @@ from speech.analysis import analyze_speech
 app = Flask(__name__)
 CORS(app)  # allow the Vite dev server (different port) to call this API
 
-evaluator = GeminiEvaluator()
+evaluator = LLMEvaluator()
 cv_engine = ComputerVisionEngine()
 
 MAX_UPLOAD_MB = 5
@@ -40,9 +47,13 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 @app.get("/api/health")
 def health():
+    status = evaluator.client.is_ready()
     return jsonify({
         "status": "ok",
-        "gemini_configured": bool(os.getenv("GEMINI_API_KEY")),
+        "ollama_running": status["ollama_running"],
+        "model_pulled": status["model_pulled"],
+        "model": evaluator.client.model,
+        "available_models": status["models"],
     })
 
 
@@ -58,7 +69,7 @@ def evaluate_answer():
 
     try:
         result = evaluator.evaluate(question, answer)
-    except GeminiNotConfiguredError as e:
+    except OllamaNotAvailableError as e:
         return jsonify({"error": str(e)}), 503
     except Exception as e:
         return jsonify({"error": f"Evaluation failed: {e}"}), 500
@@ -67,7 +78,7 @@ def evaluate_answer():
         return jsonify({"error": "Model returned an unexpected format.", "raw": result["raw_response"]}), 502
 
     # Fluency is computed quantitatively (word count + timing + filler
-    # words), not by Gemini, so it's added on separately when the client
+    # words), not by the LLM, so it's added on separately when the client
     # (camera/speech mode) provides how long the answer took to speak.
     if duration_seconds:
         try:
@@ -134,7 +145,7 @@ def analyze_resume():
 
     try:
         result = evaluator.analyze_resume(text, target_role)
-    except GeminiNotConfiguredError as e:
+    except OllamaNotAvailableError as e:
         return jsonify({"error": str(e)}), 503
     except Exception as e:
         return jsonify({"error": f"Analysis failed: {e}"}), 500
@@ -145,6 +156,109 @@ def analyze_resume():
     return jsonify(result)
 
 
+@app.post("/api/skills/analyze-gap")
+def analyze_skill_gap():
+    data = request.get_json(silent=True) or {}
+    current_skills = data.get("current_skills") or []
+    target_role = data.get("target_role")
+
+    if not current_skills:
+        return jsonify({"error": "'current_skills' (list of {name, pct}) is required."}), 400
+
+    try:
+        result = evaluator.analyze_skill_gap(current_skills, target_role)
+    except OllamaNotAvailableError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"error": f"Skill gap analysis failed: {e}"}), 500
+
+    if "raw_response" in result:
+        return jsonify({"error": "Model returned an unexpected format.", "raw": result["raw_response"]}), 502
+
+    return jsonify(result)
+
+
+@app.post("/api/courses/recommend")
+def recommend_courses():
+    data = request.get_json(silent=True) or {}
+    skills = data.get("skills") or []
+    interests = data.get("interests") or []
+    target_role = data.get("target_role")
+    completed_courses = data.get("completed_courses") or []
+    num_courses = data.get("num_courses", 6)
+
+    if not skills and not interests and not target_role:
+        return jsonify({"error": "Provide at least one of 'skills', 'interests', or 'target_role'."}), 400
+
+    try:
+        result = evaluator.recommend_courses(
+            skills=skills,
+            interests=interests,
+            target_role=target_role,
+            completed_courses=completed_courses,
+            num_courses=num_courses,
+        )
+    except OllamaNotAvailableError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"error": f"Recommendation failed: {e}"}), 500
+
+    if "raw_response" in result:
+        return jsonify({"error": "Model returned an unexpected format.", "raw": result["raw_response"]}), 502
+
+    return jsonify(result)
+
+
+@app.post("/api/courses/generate-content")
+def generate_course_content():
+    data = request.get_json(silent=True) or {}
+    course_title = (data.get("course_title") or "").strip()
+    level = data.get("level") or "Intermediate"
+    tag = data.get("tag")
+
+    if not course_title:
+        return jsonify({"error": "'course_title' is required."}), 400
+
+    try:
+        result = evaluator.generate_course_content(course_title, level, tag)
+    except OllamaNotAvailableError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"error": f"Content generation failed: {e}"}), 500
+
+    if "raw_response" in result:
+        return jsonify({"error": "Model returned an unexpected format.", "raw": result["raw_response"]}), 502
+
+    return jsonify(result)
+
+
+@app.post("/api/courses/generate-assessment")
+def generate_assessment():
+    data = request.get_json(silent=True) or {}
+    course_title = (data.get("course_title") or "").strip()
+    level = data.get("level") or "Intermediate"
+    num_questions = data.get("num_questions", 5)
+
+    if not course_title:
+        return jsonify({"error": "'course_title' is required."}), 400
+
+    try:
+        num_questions = max(3, min(10, int(num_questions)))
+    except (TypeError, ValueError):
+        num_questions = 5
+
+    try:
+        result = evaluator.generate_assessment(course_title, level, num_questions)
+    except OllamaNotAvailableError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"error": f"Assessment generation failed: {e}"}), 500
+
+    if "raw_response" in result:
+        return jsonify({"error": "Model returned an unexpected format.", "raw": result["raw_response"]}), 502
+
+    return jsonify(result)
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
-

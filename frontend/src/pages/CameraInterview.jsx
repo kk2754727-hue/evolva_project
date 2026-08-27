@@ -250,7 +250,7 @@ export default function CameraInterview() {
         </h1>
         <p className="text-sm mb-6" style={{ color: C.muted }}>
           Full AI interview session — your webcam checks eye contact & body language,
-          your voice is transcribed live, and Gemini scores your answer's content, grammar, and fluency.
+          your voice is transcribed live, and your local LLM scores your answer's content, grammar, and fluency.
         </p>
         <div className="grid md:grid-cols-2 gap-5">
           {INTERVIEW_TRACKS.map((t) => (

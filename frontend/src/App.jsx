@@ -13,6 +13,7 @@ import MockInterview from "./pages/MockInterview";
 import CameraInterview from "./pages/CameraInterview";
 import Placement from "./pages/Placement";
 import Recommendations from "./pages/Recommendations";
+import CourseDetail from "./pages/CourseDetail";
 import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/mock-interview/camera" element={<CameraInterview />} />
         <Route path="/placement-prediction" element={<Placement />} />
         <Route path="/recommendations" element={<Recommendations />} />
+        <Route path="/recommendations/course" element={<CourseDetail />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={<Settings />} />

@@ -26,15 +26,54 @@ export async function evaluateAnswer(question, answer, durationSeconds) {
   return data;
 }
 
-export async function analyzeFrame(base64Image) {
-  const res = await fetch(`${API_BASE}/api/interview/analyze-frame`, {
+export async function analyzeSkillGap(payload) {
+  const res = await fetch(`${API_BASE}/api/skills/analyze-gap`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: base64Image }),
+    body: JSON.stringify(payload),
   });
   const data = await parseJsonSafely(res);
   if (!res.ok) {
-    throw new Error(data?.error || `Frame analysis failed (${res.status})`);
+    throw new Error(data?.error || `Skill gap analysis failed (${res.status})`);
+  }
+  return data;
+}
+
+export async function recommendCourses(payload) {
+  const res = await fetch(`${API_BASE}/api/courses/recommend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJsonSafely(res);
+  if (!res.ok) {
+    throw new Error(data?.error || `Recommendation failed (${res.status})`);
+  }
+  return data;
+}
+
+export async function generateCourseContent(payload) {
+  const res = await fetch(`${API_BASE}/api/courses/generate-content`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJsonSafely(res);
+  if (!res.ok) {
+    throw new Error(data?.error || `Content generation failed (${res.status})`);
+  }
+  return data;
+}
+
+export async function generateAssessment(payload) {
+  const res = await fetch(`${API_BASE}/api/courses/generate-assessment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJsonSafely(res);
+  if (!res.ok) {
+    throw new Error(data?.error || `Assessment generation failed (${res.status})`);
   }
   return data;
 }
@@ -51,6 +90,19 @@ export async function analyzeResume(file, targetRole) {
   const data = await parseJsonSafely(res);
   if (!res.ok) {
     throw new Error(data?.error || `Resume analysis failed (${res.status})`);
+  }
+  return data;
+}
+
+export async function analyzeFrame(base64Image) {
+  const res = await fetch(`${API_BASE}/api/interview/analyze-frame`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: base64Image }),
+  });
+  const data = await parseJsonSafely(res);
+  if (!res.ok) {
+    throw new Error(data?.error || `Frame analysis failed (${res.status})`);
   }
   return data;
 }

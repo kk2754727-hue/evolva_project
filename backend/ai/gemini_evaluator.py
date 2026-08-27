@@ -111,3 +111,156 @@ Rules:
             contents=prompt
         )
         return self._strip_and_parse(response.text)
+
+    def recommend_courses(self, skills=None, interests=None, target_role=None,
+                           completed_courses=None, num_courses=6):
+        skills = skills or []
+        interests = interests or []
+        completed_courses = completed_courses or []
+
+        prompt = f"""
+You are a career-guidance AI for a student/placement-prep platform.
+
+Student profile:
+- Current skills: {", ".join(skills) if skills else "not specified"}
+- Interests: {", ".join(interests) if interests else "not specified"}
+- Target role: {target_role or "not specified - infer a sensible one from skills/interests"}
+- Already completed courses: {", ".join(completed_courses) if completed_courses else "none"}
+
+Recommend exactly {num_courses} courses that would most help this student
+close their skill gaps and reach their target role. Don't repeat anything
+in "already completed courses". Order them by priority (most important
+first).
+
+Return ONLY valid JSON in exactly this format:
+
+{{
+  "courses": [
+    {{
+      "title": "",
+      "tag": "",
+      "level": "Beginner | Intermediate | Advanced",
+      "description": "",
+      "estimated_hours": 0,
+      "matched_skills": [],
+      "why_recommended": ""
+    }}
+  ]
+}}
+
+Rules:
+- "tag" is a short category like "Python", "DSA", "Cloud", "AI/ML", "SQL", "Frontend", "Backend", "Aptitude".
+- "description" is 1-2 sentences.
+- "why_recommended" is 1 sentence tying it directly to this student's stated skills/interests/role.
+- "matched_skills" lists 2-4 skills from the student's profile (or gaps) this course addresses.
+- Return ONLY the JSON object, no markdown fences, no commentary.
+"""
+        response = self.client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return self._strip_and_parse(response.text)
+
+    def generate_course_content(self, course_title, level="Intermediate", tag=None):
+        context_line = f"Category: {tag}" if tag else ""
+
+        prompt = f"""
+You are an expert curriculum designer creating course content for a
+placement-prep learning platform.
+
+Course title: {course_title}
+Level: {level}
+{context_line}
+
+Generate a complete course outline with real, substantive lesson content
+(not just titles - actual explanations a student could learn from).
+
+Return ONLY valid JSON in exactly this format:
+
+{{
+  "course_title": "{course_title}",
+  "level": "{level}",
+  "estimated_hours": 0,
+  "modules": [
+    {{
+      "module_title": "",
+      "lessons": [
+        {{
+          "lesson_title": "",
+          "content": "",
+          "key_points": []
+        }}
+      ]
+    }}
+  ]
+}}
+
+Rules:
+- 3-5 modules, each with 2-4 lessons.
+- "content" is a substantive explanation of the lesson topic, written in
+  clear plain language, roughly 100-200 words - enough for the student to
+  actually learn the concept, not just a topic label.
+- "key_points" is 3-5 short bullet takeaways for that lesson.
+- Order modules from foundational to advanced.
+- Return ONLY the JSON object, no markdown fences, no commentary.
+"""
+        response = self.client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return self._strip_and_parse(response.text)
+
+    def generate_assessment(self, course_title, level="Intermediate", num_questions=5):
+        prompt = f"""
+You are creating a graded assessment for a student who just finished a
+course.
+
+Course title: {course_title}
+Level: {level}
+Number of questions: {num_questions}
+
+Return ONLY valid JSON in exactly this format:
+
+{{
+  "course_title": "{course_title}",
+  "passing_score": 70,
+  "questions": [
+    {{
+      "id": "q1",
+      "prompt": "",
+      "options": [
+        {{ "id": "a", "text": "" }},
+        {{ "id": "b", "text": "" }},
+        {{ "id": "c", "text": "" }},
+        {{ "id": "d", "text": "" }}
+      ],
+      "correct_option_id": "a",
+      "explanation": ""
+    }}
+  ],
+  "reward": {{
+    "badge_name": "",
+    "xp_points": 0,
+    "certificate_line": ""
+  }}
+}}
+
+Rules:
+- Exactly {num_questions} multiple-choice questions, each with exactly 4
+  options and exactly one correct answer.
+- Questions should test real understanding of {course_title} at {level}
+  level, not trivia.
+- "explanation" briefly says why the correct answer is right (1 sentence).
+- "badge_name" is a short, motivating badge title for passing this course's
+  assessment (e.g. "Python Fundamentals Certified").
+- "xp_points" is an integer between 50 and 200 based on the course's level
+  (higher for Advanced).
+- "certificate_line" is one sentence a student could show on a resume/profile
+  after passing (e.g. "Completed and passed assessment for {course_title}").
+- Return ONLY the JSON object, no markdown fences, no commentary.
+"""
+        response = self.client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return self._strip_and_parse(response.text)
