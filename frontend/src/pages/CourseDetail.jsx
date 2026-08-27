@@ -8,30 +8,39 @@ const CourseDetail = () => {
   const navigate = useNavigate();
 
   /*
-   * Course can be passed through React Router state:
-   * navigate(`/courses/${course.id}`, { state: { course } })
+   * Courses.jsx sends:
+   * navigate("/courses/learn", { state: { tag: c.tag, course: c } })
    *
-   * We also support a courseId coming directly from the URL.
+   * We also support opening the page directly with:
+   * /courses/learn/:courseId
    */
-  const course = location.state?.course || {
-    id: courseId,
-    slug: courseId,
-    title: courseId,
-  };
+  const course = location.state?.course || null;
 
+  const courseTag =
+    location.state?.tag ||
+    course?.tag ||
+    course?.slug ||
+    courseId ||
+    "";
+
+  /*
+   * courseContent.js is keyed by course tags such as:
+   * PYTHON, JAVA, DSA, SQL, AI/ML, CLOUD, APTITUDE, FRONTEND
+   */
   const content = useMemo(() => {
-    return getCourseContent(course);
-  }, [course]);
+    return getCourseContent(courseTag);
+  }, [courseTag]);
 
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
 
+  const storageKey = `evolva_completed_${String(courseTag || courseId || "course")
+    .toUpperCase()
+    .replace(/[\s/]+/g, "_")}`;
+
   const [completedLessons, setCompletedLessons] = useState(() => {
     try {
-      const saved = localStorage.getItem(
-        `evolva_completed_${course?.id || courseId}`
-      );
-
+      const saved = localStorage.getItem(storageKey);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -39,71 +48,68 @@ const CourseDetail = () => {
   });
 
   /*
-   * Save progress whenever completedLessons changes.
-   */
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        `evolva_completed_${course?.id || courseId}`,
-        JSON.stringify(completedLessons)
-      );
-    } catch (error) {
-      console.error("Unable to save course progress:", error);
-    }
-  }, [completedLessons, course?.id, courseId]);
-
-  /*
-   * Reset lesson selection when a different course is opened.
+   * Reset lesson selection and progress when a different course is opened.
    */
   useEffect(() => {
     setCurrentModuleIndex(0);
     setCurrentLessonIndex(0);
-  }, [courseId]);
+
+    try {
+      const saved = localStorage.getItem(storageKey);
+      setCompletedLessons(saved ? JSON.parse(saved) : []);
+    } catch {
+      setCompletedLessons([]);
+    }
+  }, [storageKey]);
 
   /*
-   * If the course content does not exist.
+   * Save progress.
    */
-  if (!content) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
-        <div className="max-w-lg w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
-          <div className="text-5xl mb-4">📚</div>
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(completedLessons));
+    } catch (error) {
+      console.error("Unable to save course progress:", error);
+    }
+  }, [completedLessons, storageKey]);
 
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-            Course Coming Soon
-          </h1>
+  /*
+   * Normalize the existing courseContent.js field names.
+   *
+   * courseContent.js uses:
+   * module_title
+   * lesson_title
+   * key_points
+   * practice_problems
+   *
+   * The UI below uses these exact fields, so no changes to courseContent.js
+   * are required.
+   */
+  const modules = useMemo(() => {
+    if (!Array.isArray(content?.modules)) return [];
 
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            We couldn't find course content for this course yet.
-          </p>
-
-          <button
-            onClick={() => navigate("/courses")}
-            className="px-6 py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
-          >
-            Back to Courses
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const modules = Array.isArray(content.modules) ? content.modules : [];
+    return content.modules.map((module) => ({
+      ...module,
+      displayTitle:
+        module.module_title ||
+        module.title ||
+        "Untitled Module",
+      lessons: Array.isArray(module.lessons) ? module.lessons : [],
+    }));
+  }, [content]);
 
   const currentModule = modules[currentModuleIndex];
-
   const lessons = currentModule?.lessons || [];
-
   const currentLesson = lessons[currentLessonIndex];
 
   /*
-   * Flatten all lessons so Previous/Next can move across modules.
+   * Flatten lessons so Previous / Next can move across modules.
    */
   const allLessons = useMemo(() => {
     const result = [];
 
     modules.forEach((module, moduleIndex) => {
-      (module.lessons || []).forEach((lesson, lessonIndex) => {
+      module.lessons.forEach((lesson, lessonIndex) => {
         result.push({
           lesson,
           moduleIndex,
@@ -123,7 +129,13 @@ const CourseDetail = () => {
 
   const totalLessons = allLessons.length;
 
-  const completedCount = completedLessons.length;
+  /*
+   * Prevent progress from exceeding 100% if localStorage contains stale data.
+   */
+  const completedCount = Math.min(
+    completedLessons.length,
+    totalLessons
+  );
 
   const progress =
     totalLessons > 0
@@ -137,7 +149,9 @@ const CourseDetail = () => {
     return (
       lesson?.id ||
       lesson?.slug ||
-      `${course?.id || courseId}-module-${moduleIndex}-lesson-${lessonIndex}`
+      `${String(courseTag || "course")
+        .toUpperCase()
+        .replace(/[\s/]+/g, "_")}-module-${moduleIndex}-lesson-${lessonIndex}`
     );
   };
 
@@ -153,9 +167,6 @@ const CourseDetail = () => {
     ? completedLessons.includes(currentLessonId)
     : false;
 
-  /*
-   * Mark the current lesson as completed.
-   */
   const markLessonComplete = () => {
     if (!currentLessonId) return;
 
@@ -168,9 +179,6 @@ const CourseDetail = () => {
     });
   };
 
-  /*
-   * Open a lesson from the sidebar.
-   */
   const openLesson = (moduleIndex, lessonIndex) => {
     setCurrentModuleIndex(moduleIndex);
     setCurrentLessonIndex(lessonIndex);
@@ -181,9 +189,6 @@ const CourseDetail = () => {
     });
   };
 
-  /*
-   * Go to previous lesson.
-   */
   const goPrevious = () => {
     if (currentGlobalIndex <= 0) return;
 
@@ -198,18 +203,14 @@ const CourseDetail = () => {
     });
   };
 
-  /*
-   * Go to next lesson.
-   */
   const goNext = () => {
     if (currentGlobalIndex < 0) return;
 
+    markLessonComplete();
+
     if (currentGlobalIndex >= allLessons.length - 1) {
-      markLessonComplete();
       return;
     }
-
-    markLessonComplete();
 
     const next = allLessons[currentGlobalIndex + 1];
 
@@ -222,29 +223,47 @@ const CourseDetail = () => {
     });
   };
 
-  /*
-   * Get previous / next state.
-   */
   const hasPrevious = currentGlobalIndex > 0;
   const hasNext =
     currentGlobalIndex >= 0 &&
     currentGlobalIndex < allLessons.length - 1;
 
-  /*
-   * Safe quiz extraction.
-   *
-   * Your courseContent uses:
-   * lesson.quiz
-   */
   const quizQuestions = Array.isArray(currentLesson?.quiz)
     ? currentLesson.quiz
     : [];
 
+  if (!content) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
+        <div className="max-w-lg w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
+          <div className="text-5xl mb-4">📚</div>
+
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+            Course Coming Soon
+          </h1>
+
+          <p className="text-gray-600 dark:text-gray-300 mb-2">
+            We couldn't find course content for:
+          </p>
+
+          <p className="font-bold text-blue-600 dark:text-blue-400 mb-6">
+            {courseTag || "Unknown course"}
+          </p>
+
+          <button
+            onClick={() => navigate("/courses")}
+            className="px-6 py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
+          >
+            Back to Courses
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
-      {/* ============================================================
-          TOP HEADER
-      ============================================================ */}
+      {/* TOP HEADER */}
       <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -257,14 +276,18 @@ const CourseDetail = () => {
               </button>
 
               <h1 className="text-xl md:text-2xl font-bold">
-                {content.title || course.title || "Course"}
+                {content.title ||
+                  course?.title ||
+                  String(courseTag)}
               </h1>
 
-              {content.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  {content.description}
-                </p>
-              )}
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {content.level
+                  ? `${content.level} · ${
+                      content.estimated_hours || "Self-paced"
+                    } hours`
+                  : "Self-paced course"}
+              </p>
             </div>
 
             {/* Progress */}
@@ -289,20 +312,18 @@ const CourseDetail = () => {
         </div>
       </header>
 
-      {/* ============================================================
-          MAIN LAYOUT
-      ============================================================ */}
+      {/* MAIN LAYOUT */}
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row">
-        {/* ==========================================================
-            SIDEBAR
-        ========================================================== */}
+        {/* SIDEBAR */}
         <aside className="lg:w-80 lg:min-h-[calc(100vh-100px)] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
           <div className="p-4">
-            <h2 className="font-bold text-lg mb-4">Course Content</h2>
+            <h2 className="font-bold text-lg mb-4">
+              Course Content
+            </h2>
 
             <div className="space-y-3">
               {modules.map((module, moduleIndex) => {
-                const moduleLessons = module.lessons || [];
+                const moduleLessons = module.lessons;
 
                 const moduleCompleted = moduleLessons.filter(
                   (lesson, lessonIndex) => {
@@ -321,11 +342,11 @@ const CourseDetail = () => {
                     key={module.id || moduleIndex}
                     className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
                   >
-                    {/* Module heading */}
                     <button
-                      onClick={() =>
-                        setCurrentModuleIndex(moduleIndex)
-                      }
+                      onClick={() => {
+                        setCurrentModuleIndex(moduleIndex);
+                        setCurrentLessonIndex(0);
+                      }}
                       className="w-full text-left p-4 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -335,7 +356,7 @@ const CourseDetail = () => {
                           </p>
 
                           <h3 className="font-semibold">
-                            {module.title || `Module ${moduleIndex + 1}`}
+                            {module.displayTitle}
                           </h3>
                         </div>
 
@@ -345,7 +366,6 @@ const CourseDetail = () => {
                       </div>
                     </button>
 
-                    {/* Lessons */}
                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
                       {moduleLessons.map((lesson, lessonIndex) => {
                         const lessonId = getLessonId(
@@ -365,7 +385,10 @@ const CourseDetail = () => {
                           <button
                             key={lessonId}
                             onClick={() =>
-                              openLesson(moduleIndex, lessonIndex)
+                              openLesson(
+                                moduleIndex,
+                                lessonIndex
+                              )
                             }
                             className={`w-full text-left px-4 py-3 flex items-center gap-3 transition ${
                               active
@@ -382,11 +405,14 @@ const CourseDetail = () => {
                                   : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
                               }`}
                             >
-                              {completed ? "✓" : lessonIndex + 1}
+                              {completed
+                                ? "✓"
+                                : lessonIndex + 1}
                             </span>
 
                             <span className="text-sm">
-                              {lesson.title ||
+                              {lesson.lesson_title ||
+                                lesson.title ||
                                 `Lesson ${lessonIndex + 1}`}
                             </span>
                           </button>
@@ -400,9 +426,7 @@ const CourseDetail = () => {
           </div>
         </aside>
 
-        {/* ==========================================================
-            LESSON CONTENT
-        ========================================================== */}
+        {/* LESSON CONTENT */}
         <main className="flex-1 min-w-0">
           <div className="max-w-4xl mx-auto px-4 md:px-8 py-8">
             {!currentLesson ? (
@@ -417,7 +441,7 @@ const CourseDetail = () => {
               </div>
             ) : (
               <>
-                {/* Lesson title */}
+                {/* LESSON TITLE */}
                 <div className="mb-8">
                   <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-2">
                     Module {currentModuleIndex + 1} · Lesson{" "}
@@ -425,34 +449,38 @@ const CourseDetail = () => {
                   </p>
 
                   <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                    {currentLesson.title ||
+                    {currentLesson.lesson_title ||
+                      currentLesson.title ||
                       `Lesson ${currentLessonIndex + 1}`}
                   </h2>
 
-                  {currentLesson.description && (
+                  {currentLesson.introduction && (
                     <p className="text-lg text-gray-600 dark:text-gray-300">
-                      {currentLesson.description}
+                      {currentLesson.introduction}
                     </p>
                   )}
+
+                  {!currentLesson.introduction &&
+                    currentLesson.description && (
+                      <p className="text-lg text-gray-600 dark:text-gray-300">
+                        {currentLesson.description}
+                      </p>
+                    )}
                 </div>
 
-                {/* ==================================================
-                    LESSON CONTENT
-                ================================================== */}
+                {/* LESSON CONTENT */}
                 <LessonContent lesson={currentLesson} />
 
-                {/* ==================================================
-                    KEY POINTS
-                ================================================== */}
-                {Array.isArray(currentLesson.keyPoints) &&
-                  currentLesson.keyPoints.length > 0 && (
+                {/* KEY POINTS */}
+                {Array.isArray(currentLesson.key_points) &&
+                  currentLesson.key_points.length > 0 && (
                     <section className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-2xl p-6">
                       <h3 className="text-xl font-bold mb-4">
                         💡 Key Points
                       </h3>
 
                       <ul className="space-y-3">
-                        {currentLesson.keyPoints.map(
+                        {currentLesson.key_points.map(
                           (point, index) => (
                             <li
                               key={index}
@@ -470,18 +498,18 @@ const CourseDetail = () => {
                     </section>
                   )}
 
-                {/* ==================================================
-                    PRACTICE
-                ================================================== */}
-                {Array.isArray(currentLesson.practice) &&
-                  currentLesson.practice.length > 0 && (
+                {/* PRACTICE */}
+                {Array.isArray(
+                  currentLesson.practice_problems
+                ) &&
+                  currentLesson.practice_problems.length > 0 && (
                     <section className="mt-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
                       <h3 className="text-xl font-bold mb-5">
                         📝 Practice Problems
                       </h3>
 
                       <div className="space-y-5">
-                        {currentLesson.practice.map(
+                        {currentLesson.practice_problems.map(
                           (problem, index) => (
                             <PracticeProblem
                               key={index}
@@ -494,18 +522,14 @@ const CourseDetail = () => {
                     </section>
                   )}
 
-                {/* ==================================================
-                    LESSON QUIZ
-                ================================================== */}
+                {/* QUIZ */}
                 {quizQuestions.length > 0 && (
                   <LessonQuiz
                     questions={quizQuestions}
                   />
                 )}
 
-                {/* ==================================================
-                    COMPLETE LESSON
-                ================================================== */}
+                {/* COMPLETE LESSON */}
                 <section className="mt-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
@@ -537,9 +561,7 @@ const CourseDetail = () => {
                   </div>
                 </section>
 
-                {/* ==================================================
-                    PREVIOUS / NEXT
-                ================================================== */}
+                {/* PREVIOUS / NEXT */}
                 <div className="mt-8 flex items-center justify-between gap-4">
                   <button
                     onClick={goPrevious}
@@ -554,19 +576,28 @@ const CourseDetail = () => {
                   </button>
 
                   <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {currentGlobalIndex + 1} / {totalLessons}
+                    {totalLessons > 0
+                      ? currentGlobalIndex + 1
+                      : 0}{" "}
+                    / {totalLessons}
                   </span>
 
                   <button
                     onClick={goNext}
-                    disabled={!hasNext}
+                    disabled={!hasNext && isCurrentLessonCompleted}
                     className={`px-5 py-3 rounded-lg font-medium transition ${
                       hasNext
                         ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "opacity-40 cursor-not-allowed bg-gray-100 dark:bg-gray-800"
+                        : isCurrentLessonCompleted
+                        ? "opacity-40 cursor-not-allowed bg-gray-100 dark:bg-gray-800"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                   >
-                    {hasNext ? "Next →" : "Course Complete ✓"}
+                    {hasNext
+                      ? "Next →"
+                      : isCurrentLessonCompleted
+                      ? "Course Complete ✓"
+                      : "Complete Course ✓"}
                   </button>
                 </div>
               </>
@@ -579,15 +610,10 @@ const CourseDetail = () => {
 };
 
 /* ================================================================
-   LESSON CONTENT COMPONENT
+   LESSON CONTENT
 ================================================================ */
 
 const LessonContent = ({ lesson }) => {
-  /*
-   * Supports different content structures so your existing
-   * courseContent.js does not have to be rewritten.
-   */
-
   if (Array.isArray(lesson.sections)) {
     return (
       <div className="space-y-6">
@@ -601,27 +627,70 @@ const LessonContent = ({ lesson }) => {
     );
   }
 
-  if (lesson.content) {
-    return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
-        <FormattedContent content={lesson.content} />
-      </div>
-    );
-  }
-
-  if (lesson.explanation) {
-    return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
-        <FormattedContent content={lesson.explanation} />
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
-      <p className="text-gray-600 dark:text-gray-300">
-        Lesson content is available in the course data.
-      </p>
+    <div className="space-y-6">
+      {lesson.explanation && (
+        <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
+          <h3 className="text-xl font-bold mb-4">
+            Explanation
+          </h3>
+
+          <FormattedContent content={lesson.explanation} />
+        </section>
+      )}
+
+      {lesson.syntax && (
+        <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
+          <h3 className="text-xl font-bold mb-4">
+            Syntax
+          </h3>
+
+          <CodeBlock code={lesson.syntax} />
+        </section>
+      )}
+
+      {lesson.example_code && (
+        <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
+          <h3 className="text-xl font-bold mb-4">
+            Example
+          </h3>
+
+          <CodeBlock code={lesson.example_code} />
+
+          {lesson.example_output && (
+            <div className="mt-5">
+              <p className="text-sm font-semibold mb-2">
+                Output
+              </p>
+
+              <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">
+                {lesson.example_output}
+              </pre>
+            </div>
+          )}
+
+          {lesson.example_explanation && (
+            <div className="mt-5">
+              <p className="text-sm font-semibold mb-2">
+                Explanation
+              </p>
+
+              <FormattedContent
+                content={lesson.example_explanation}
+              />
+            </div>
+          )}
+        </section>
+      )}
+
+      {!lesson.explanation &&
+        !lesson.syntax &&
+        !lesson.example_code &&
+        lesson.content && (
+          <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
+            <FormattedContent content={lesson.content} />
+          </section>
+        )}
     </div>
   );
 };
@@ -651,9 +720,7 @@ const ContentSection = ({ section }) => {
         <FormattedContent content={section.content} />
       )}
 
-      {section.code && (
-        <CodeBlock code={section.code} />
-      )}
+      {section.code && <CodeBlock code={section.code} />}
 
       {section.output && (
         <div className="mt-4">
@@ -661,7 +728,7 @@ const ContentSection = ({ section }) => {
             Output
           </p>
 
-          <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto">
+          <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">
             {section.output}
           </pre>
         </div>
@@ -691,6 +758,10 @@ const FormattedContent = ({ content }) => {
 ================================================================ */
 
 const CodeBlock = ({ code }) => {
+  if (typeof code !== "string") {
+    return null;
+  }
+
   return (
     <pre className="mt-4 bg-gray-950 text-gray-100 rounded-xl p-5 overflow-x-auto text-sm leading-6">
       <code>{code}</code>
@@ -706,7 +777,7 @@ const PracticeProblem = ({ problem, index }) => {
   if (typeof problem === "string") {
     return (
       <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-        <div className="font-semibold mb-2">
+        <div className="font-semibold">
           {index + 1}. {problem}
         </div>
       </div>
@@ -812,10 +883,13 @@ const LessonQuiz = ({ questions }) => {
                         checked={selected}
                         onChange={() =>
                           !submitted &&
-                          setSelectedAnswers((previous) => ({
-                            ...previous,
-                            [questionIndex]: optionIndex,
-                          }))
+                          setSelectedAnswers(
+                            (previous) => ({
+                              ...previous,
+                              [questionIndex]:
+                                optionIndex,
+                            })
+                          )
                         }
                         disabled={submitted}
                       />
