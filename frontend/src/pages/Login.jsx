@@ -1,114 +1,173 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Sparkles, FileText, Video, Target, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  Sparkles, Mail, Lock, ArrowRight, Loader2,
+  AlertTriangle, Eye, EyeOff, FileText, Video, Target,
+} from "lucide-react";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Login() {
-  const navigate = useNavigate();
-  const [showPw, setShowPw] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const navigate       = useNavigate();
+  const [email, setEmail]     = useState("");
+  const [password, setPass]   = useState("");
+  const [showPass, setShow]   = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
 
-  const bullets = [
-    { icon: FileText, label: "Resume Scanner" },
-    { icon: Video, label: "Mock AI Interview" },
-    { icon: Target, label: "Skill Evaluator" },
-  ];
-
-  const handleSignIn = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: wire this up to POST /api/auth/login once the backend is ready
-    navigate("/dashboard");
+    setError("");
+    if (!email.trim() || !password) { setError("Email and password are required."); return; }
+    setLoading(true);
+    try {
+      const res  = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Login failed.");
+      // Store user info
+      sessionStorage.setItem("evolva_user", JSON.stringify(data.user));
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const bullets = [
+    { icon: FileText, label: "Resume ATS Scorer"  },
+    { icon: Target,   label: "Skill Gap Analyzer" },
+    { icon: Video,    label: "AI Mock Interviews" },
+  ];
+
   return (
-    <div className="grid md:grid-cols-2 min-h-screen">
-      <div className="relative p-10 md:p-14 flex flex-col justify-center" style={{ background: "linear-gradient(135deg,#161b3a,#0a0e17)" }}>
-        <div className="flex items-center gap-2 mb-16 cursor-pointer" onClick={() => navigate("/")}>
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#5865f2,#8b6bf7,#14c88e)" }}>
+    <div className="min-h-screen grid md:grid-cols-2">
+
+      {/* ── Left brand panel ─────────────────────────────────────────── */}
+      <div className="hidden md:flex flex-col justify-between p-12 relative"
+        style={{ background: "linear-gradient(160deg,#0d1130 0%,#0a0e17 60%,#101a10 100%)" }}>
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg,#5865f2,#8b6bf7,#14c88e)" }}>
             <Sparkles size={18} color="#fff" />
           </div>
           <span className="font-display font-extrabold text-xl text-white">EVOLVA</span>
         </div>
-        <h1 className="font-display font-extrabold text-4xl text-white mb-4">
-          Welcome to{" "}
-          <span style={{ background: "linear-gradient(90deg,#8b6bf7,#14c88e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>EVOLVA</span>
-        </h1>
-        <p className="text-sm mb-16 max-w-sm" style={{ color: "#9aa0bd", lineHeight: 1.7 }}>
-          AI-powered placement preparation platform translating skill improvements into corporate placement credentials.
-        </p>
-        <div className="flex flex-wrap gap-3 mb-8">
-          {bullets.map((b, i) => (
-            <span
-              key={i}
-              className="flex items-center gap-2 text-xs font-semibold text-white px-3 py-2 rounded-full float-slow"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", animationDelay: `${i * 0.4}s` }}
-            >
-              <b.icon size={13} /> {b.label}
+
+        <div>
+          <h1 className="font-display font-extrabold text-4xl text-white mb-5 leading-tight">
+            Your AI-Powered<br />
+            <span style={{ background: "linear-gradient(90deg,#8b6bf7,#14c88e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Career Engine
             </span>
-          ))}
+          </h1>
+          <p className="text-sm mb-8 max-w-xs" style={{ color: "#9aa0bd", lineHeight: 1.7 }}>
+            From skill gap to job offer — Evolva guides every step of your placement journey with real AI, not templates.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {bullets.map((b, i) => (
+              <span key={i} className="flex items-center gap-2 text-xs font-semibold text-white px-3 py-2 rounded-full"
+                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <b.icon size={13} /> {b.label}
+              </span>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-medium" style={{ color: "#6d7396" }}>
-          <span>Resume ATS Optimizer</span>
-          <span>Conversational Mock Interviews</span>
-          <span>Realtime Skill Gap Analysis</span>
-          <span>Placement Prediction Analytics</span>
-        </div>
+
+        <p className="text-xs" style={{ color: "#5a6480" }}>
+          Don't have an account?{" "}
+          <Link to="/register" className="font-semibold" style={{ color: "#8b6bf7" }}>Register →</Link>
+        </p>
+
+        <div className="absolute top-20 right-0 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ background: "#5865f2" }} />
+        <div className="absolute bottom-16 left-10 w-48 h-48 rounded-full blur-3xl opacity-10 pointer-events-none" style={{ background: "#14c88e" }} />
       </div>
 
-      <div className="flex items-center justify-center p-8" style={{ background: "#f7f7fb" }}>
-        <form onSubmit={handleSignIn} className="w-full max-w-sm">
-          <h2 className="font-display font-bold text-2xl mb-1 flex items-center gap-2" style={{ color: "#12142b" }}>
-            Sign In <Sparkles size={16} color="#4338ec" />
-          </h2>
-          <p className="text-sm mb-8" style={{ color: "#5a5f78" }}>Access your skills profile and resume score dashboards.</p>
+      {/* ── Right form panel ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-center p-8 min-h-screen" style={{ background: "#f7f7fb" }}>
+        <div className="w-full max-w-sm">
 
-          <label className="text-xs font-semibold mb-2 block" style={{ color: "#12142b" }}>Email Address *</label>
-          <div className="flex items-center gap-2 border rounded-xl px-3 py-3 mb-5 bg-white" style={{ borderColor: "#dcdcea" }}>
-            <Mail size={16} color="#9295ab" />
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@college.edu"
-              className="w-full text-sm bg-transparent"
-              style={{ color: "#12142b" }}
-            />
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2 mb-8 md:hidden cursor-pointer" onClick={() => navigate("/")}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg,#5865f2,#8b6bf7,#14c88e)" }}>
+              <Sparkles size={15} color="#fff" />
+            </div>
+            <span className="font-display font-extrabold text-lg" style={{ color: "#12142b" }}>EVOLVA</span>
           </div>
 
-          <label className="text-xs font-semibold mb-2 block" style={{ color: "#12142b" }}>Password *</label>
-          <div className="flex items-center gap-2 border rounded-xl px-3 py-3 mb-4 bg-white" style={{ borderColor: "#dcdcea" }}>
-            <Lock size={16} color="#9295ab" />
-            <input
-              type={showPw ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Type your password"
-              className="w-full text-sm bg-transparent"
-              style={{ color: "#12142b" }}
-            />
-            <button type="button" onClick={() => setShowPw(!showPw)}>
-              {showPw ? <EyeOff size={16} color="#9295ab" /> : <Eye size={16} color="#9295ab" />}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between mb-6 text-xs font-medium">
-            <label className="flex items-center gap-2" style={{ color: "#5a5f78" }}>
-              <input type="checkbox" /> Remember Me
-            </label>
-            <span style={{ color: "#4338ec" }} className="font-semibold cursor-pointer">Forgot Password?</span>
-          </div>
-
-          <button type="submit" className="w-full text-white font-semibold py-3.5 rounded-xl mb-4" style={{ background: "linear-gradient(90deg,#4338ec,#6d5bf5)" }}>
-            Sign In
-          </button>
-          <div className="text-center text-xs mb-4" style={{ color: "#9295ab" }}>OR</div>
-          <button type="button" onClick={() => navigate("/dashboard")} className="w-full flex items-center justify-center gap-2 font-semibold py-3.5 rounded-xl border bg-white" style={{ borderColor: "#dcdcea", color: "#12142b" }}>
-            Continue with Google
-          </button>
-          <p className="text-center text-xs mt-6" style={{ color: "#5a5f78" }}>
-            Don't have an account?{" "}
-            <span style={{ color: "#4338ec" }} className="font-semibold cursor-pointer" onClick={() => navigate("/dashboard")}>Register Now</span>
+          <h2 className="font-display font-bold text-2xl mb-1" style={{ color: "#12142b" }}>Welcome back</h2>
+          <p className="text-sm mb-8" style={{ color: "#5a5f78" }}>
+            Sign in to continue your placement preparation.
           </p>
-        </form>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email */}
+            <div>
+              <label className="text-xs font-semibold mb-1.5 block" style={{ color: "#12142b" }}>
+                Email Address
+              </label>
+              <div className="flex items-center gap-2 border rounded-xl px-3 py-3 bg-white focus-within:border-indigo-500 transition-colors"
+                style={{ borderColor: "#dcdcea" }}>
+                <Mail size={15} color="#9295ab" />
+                <input
+                  type="email" value={email} autoFocus autoComplete="email"
+                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  placeholder="you@example.com"
+                  className="w-full text-sm bg-transparent outline-none"
+                  style={{ color: "#12142b" }}
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="text-xs font-semibold mb-1.5 block" style={{ color: "#12142b" }}>
+                Password
+              </label>
+              <div className="flex items-center gap-2 border rounded-xl px-3 py-3 bg-white focus-within:border-indigo-500 transition-colors"
+                style={{ borderColor: "#dcdcea" }}>
+                <Lock size={15} color="#9295ab" />
+                <input
+                  type={showPass ? "text" : "password"} value={password}
+                  onChange={(e) => { setPass(e.target.value); setError(""); }}
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                  className="w-full text-sm bg-transparent outline-none"
+                  style={{ color: "#12142b" }}
+                />
+                <button type="button" onClick={() => setShow((s) => !s)}>
+                  {showPass ? <EyeOff size={15} color="#9295ab" /> : <Eye size={15} color="#9295ab" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="flex items-start gap-2 text-xs p-3 rounded-xl" style={{ background: "#fef2f2", color: "#b91c1c" }}>
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <button type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3.5 rounded-xl disabled:opacity-60 mt-2"
+              style={{ background: "linear-gradient(90deg,#4338ec,#6d5bf5)" }}>
+              {loading
+                ? <><Loader2 size={16} className="animate-spin" /> Signing in…</>
+                : <><ArrowRight size={16} /> Sign In</>}
+            </button>
+
+            <p className="text-center text-xs pt-1" style={{ color: "#9295ab" }}>
+              Don't have an account?{" "}
+              <Link to="/register" className="font-semibold" style={{ color: "#4338ec" }}>Create one free</Link>
+            </p>
+          </form>
+        </div>
       </div>
     </div>
   );

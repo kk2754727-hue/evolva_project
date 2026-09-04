@@ -1,272 +1,533 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, TrendingUp, AlertTriangle, CheckCircle2, Target } from "lucide-react";
+import {
+  ArrowRight, CheckCircle2, TrendingUp, Clock, BookOpen,
+  ChevronDown, ChevronUp, Award, AlertTriangle, Zap,
+} from "lucide-react";
 import { C } from "../lib/theme";
-import { SKILLS } from "../data/mock";
 
-// ─── Target proficiency per skill per role ─────────────────────────────────
-// [current_needed, description]
-const ROLE_TARGETS = {
-  "Data Scientist": {
-    "Python & DSA":           [85, "Heavy scripting, Pandas, NumPy, OOP."],
-    "SQL & Database":         [80, "Complex queries, window functions, CTEs."],
-    "Machine Learning & AI":  [90, "Core of the role — must know supervised, unsupervised, eval metrics."],
-    "React & Web Frontend":   [30, "Nice to have for dashboards; not the focus."],
-    "Cloud & DevOps":         [60, "Model deployment on AWS/GCP is expected."],
-    "Java & OOP":             [40, "Less relevant; Python dominates this field."],
-    "System Design":          [55, "ML system design is a growing interview topic."],
-    "Communication & Aptitude":[70, "Presenting insights to non-technical stakeholders."],
-  },
-  "Backend Developer": {
-    "Python & DSA":           [80, "Python or Node backend development skills."],
-    "SQL & Database":         [85, "Schema design, indexing, transactions."],
-    "Machine Learning & AI":  [30, "Nice to have but not core for backend."],
-    "React & Web Frontend":   [35, "Basic understanding of API consumption."],
-    "Cloud & DevOps":         [75, "Deploy and scale services on cloud."],
-    "Java & OOP":             [80, "Spring Boot / microservices stack."],
-    "System Design":          [85, "High-traffic system design is heavily tested."],
-    "Communication & Aptitude":[65, "Translating requirements into technical design."],
-  },
-  "Full Stack Developer": {
-    "Python & DSA":           [75, "Backend APIs, scripting."],
-    "SQL & Database":         [75, "Relational + NoSQL (MongoDB)."],
-    "Machine Learning & AI":  [25, "Rarely required unless AI-product company."],
-    "React & Web Frontend":   [85, "Core of the frontend half of this role."],
-    "Cloud & DevOps":         [70, "CI/CD, Docker, basic cloud deployment."],
-    "Java & OOP":             [60, "Helpful if stack is Java-based."],
-    "System Design":          [75, "End-to-end system architecture."],
-    "Communication & Aptitude":[65, "Cross-functional collaboration."],
-  },
-  "Software Engineer (SDE)": {
-    "Python & DSA":           [85, "Coding rounds test DSA through Python/Java/C++."],
-    "SQL & Database":         [70, "DB design and query optimisation."],
-    "Machine Learning & AI":  [35, "Good to have for product companies."],
-    "React & Web Frontend":   [50, "Basic frontend for full-stack SDE roles."],
-    "Cloud & DevOps":         [60, "Production awareness expected at mid-level."],
-    "Java & OOP":             [80, "OOP design patterns are interview staples."],
-    "System Design":          [80, "HLD/LLD rounds at Tier-1 companies."],
-    "Communication & Aptitude":[70, "Aptitude rounds are standard in placements."],
-  },
-  "Data Analyst": {
-    "Python & DSA":           [70, "Pandas, data wrangling, automation scripts."],
-    "SQL & Database":         [90, "The single most important skill for this role."],
-    "Machine Learning & AI":  [60, "Basic ML for predictive analytics."],
-    "React & Web Frontend":   [25, "Not required."],
-    "Cloud & DevOps":         [50, "Cloud data warehouses (BigQuery, Redshift)."],
-    "Java & OOP":             [25, "Rarely needed."],
-    "System Design":          [40, "Data pipeline design is useful."],
-    "Communication & Aptitude":[80, "Translating data to business decisions."],
-  },
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────────────────────────
 
-const DEFAULT_ROLE = "Software Engineer (SDE)";
-
-// Map SKILLS entries (from mock.js) to ROLE_TARGETS keys
-const SKILL_ALIAS = {
-  "Python & DSA":            "Python & DSA",
-  "SQL & Database":          "SQL & Database",
-  "React & Web Frontend":    "React & Web Frontend",
-  "Machine Learning & AI":   "Machine Learning & AI",
-  "Cloud & DevOps":          "Cloud & DevOps",
-  "Java & OOP":              "Java & OOP",
-  "System Design":           "System Design",
-  "Communication & Aptitude":"Communication & Aptitude",
-};
-
-// Additional skills not in mock.js SKILLS but relevant to show as gaps
-const EXTRA_SKILLS = [
-  { name: "Machine Learning & AI",    pct: 0 },
-  { name: "Cloud & DevOps",           pct: 0 },
-  { name: "Java & OOP",               pct: 0 },
-  { name: "System Design",            pct: 0 },
-  { name: "Communication & Aptitude", pct: 0 },
+const ALL_SKILLS = [
+  { id: "python",   name: "Python & DSA",              defaultPct: 90, tag: "PYTHON",   icon: "🐍" },
+  { id: "sql",      name: "SQL & Database",             defaultPct: 85, tag: "SQL",      icon: "🗄️" },
+  { id: "frontend", name: "React & Web Frontend",       defaultPct: 80, tag: "FRONTEND", icon: "⚛️" },
+  { id: "ml",       name: "Machine Learning & AI",      defaultPct: 70, tag: "AI/ML",    icon: "🤖" },
+  { id: "java",     name: "Java & OOP",                 defaultPct: 50, tag: "JAVA",     icon: "☕" },
+  { id: "system",   name: "System Design",              defaultPct: 45, tag: "DSA",      icon: "🏗️" },
+  { id: "cloud",    name: "Cloud & DevOps",             defaultPct: 30, tag: "CLOUD",    icon: "☁️" },
+  { id: "comm",     name: "Communication & Aptitude",   defaultPct: 60, tag: "APTITUDE", icon: "💬" },
 ];
 
-// TAG for "Open course" navigation
-const SKILL_TO_TAG = {
-  "Python & DSA":            "PYTHON",
-  "SQL & Database":          "SQL",
-  "React & Web Frontend":    "FRONTEND",
-  "Machine Learning & AI":   "AI/ML",
-  "Cloud & DevOps":          "CLOUD",
-  "Java & OOP":              "JAVA",
-  "System Design":           "DSA",
-  "Communication & Aptitude":"APTITUDE",
+const ROLES = {
+  "Software Engineer (SDE)": {
+    color: C.blue2,
+    weights: { python: 90, sql: 70, frontend: 50, ml: 35, java: 80, system: 80, cloud: 60, comm: 70 },
+    tips: {
+      python:   "DSA coding rounds in Python/Java are the #1 filter at Tier-1 companies.",
+      sql:      "DB design and query optimisation show up in almost every backend round.",
+      frontend: "Full-stack SDE roles expect basic React knowledge.",
+      ml:       "Good to have for product companies like Google, Meta.",
+      java:     "OOP design patterns (SOLID, Factory, Observer) are interview staples.",
+      system:   "HLD/LLD rounds start at SDE-2 but appear in SDE-1 at top firms.",
+      cloud:    "Production awareness — Docker, CI/CD — expected by mid-level.",
+      comm:     "Aptitude + group discussion rounds are standard in mass recruitment.",
+    },
+  },
+  "Data Scientist": {
+    color: C.purple,
+    weights: { python: 88, sql: 80, frontend: 25, ml: 95, java: 30, system: 55, cloud: 65, comm: 72 },
+    tips: {
+      python:   "Pandas, NumPy, Scikit-learn are daily tools — must be fluent.",
+      sql:      "Complex queries, window functions, CTEs used in every data pipeline.",
+      frontend: "Streamlit/Dash dashboards help, but full frontend is not expected.",
+      ml:       "This IS the role — supervised, unsupervised, evaluation metrics, feature eng.",
+      java:     "Rarely needed; Python dominates the data science ecosystem.",
+      system:   "ML system design (feature stores, model serving) is an emerging interview topic.",
+      cloud:    "Model deployment on AWS SageMaker/GCP Vertex AI is now expected.",
+      comm:     "Translating insights to non-technical stakeholders is a core skill.",
+    },
+  },
+  "Backend Developer": {
+    color: C.green,
+    weights: { python: 80, sql: 88, frontend: 35, ml: 28, java: 82, system: 88, cloud: 78, comm: 65 },
+    tips: {
+      python:   "FastAPI/Flask or Node.js backend development; scripting and automation.",
+      sql:      "Schema design, indexing strategies, transactions, and query tuning.",
+      frontend: "Basic API consumption knowledge; REST and GraphQL fluency.",
+      ml:       "Nice to have but not core unless it's an AI-product backend.",
+      java:     "Spring Boot, microservices, and REST APIs — especially at service companies.",
+      system:   "High-traffic system design is the most heavily tested skill at senior levels.",
+      cloud:    "Deploy, scale, and monitor services on AWS/GCP — Docker + K8s basics.",
+      comm:     "Translating product requirements into technical specifications.",
+    },
+  },
+  "Full Stack Developer": {
+    color: C.amber,
+    weights: { python: 75, sql: 75, frontend: 88, ml: 22, java: 58, system: 75, cloud: 72, comm: 65 },
+    tips: {
+      python:   "Backend REST APIs, data processing scripts, ORM queries.",
+      sql:      "Relational + NoSQL (MongoDB); schema design for application data.",
+      frontend: "Core of the frontend half — React, state management, performance.",
+      ml:       "Rarely required unless the company builds AI-powered products.",
+      java:     "Helpful if the backend stack is Java/Spring; otherwise optional.",
+      system:   "End-to-end system architecture connecting frontend, backend, and DB.",
+      cloud:    "CI/CD pipelines, Docker containers, basic cloud deployment.",
+      comm:     "Cross-functional collaboration with designers and product managers.",
+    },
+  },
+  "Data Analyst": {
+    color: C.red,
+    weights: { python: 72, sql: 95, frontend: 22, ml: 62, java: 22, system: 38, cloud: 52, comm: 82 },
+    tips: {
+      python:   "Pandas for data wrangling, Matplotlib/Seaborn for visualisation.",
+      sql:      "The single most tested skill — complex joins, subqueries, aggregations.",
+      frontend: "Tableau/Power BI dashboards count; web frontend not required.",
+      ml:       "Regression, classification for predictive analytics; not deep ML.",
+      java:     "Almost never needed for analyst roles.",
+      system:   "Data pipeline design (ETL/ELT) is increasingly relevant.",
+      cloud:    "BigQuery, Redshift, Snowflake — cloud data warehouses are standard.",
+      comm:     "Storytelling with data is the primary value-add of an analyst.",
+    },
+  },
+  "ML Engineer": {
+    color: "#14c8c8",
+    weights: { python: 92, sql: 65, frontend: 28, ml: 88, java: 35, system: 78, cloud: 85, comm: 62 },
+    tips: {
+      python:   "PyTorch/TensorFlow + Python is the ML engineering stack baseline.",
+      sql:      "Feature extraction from databases; data warehouse querying.",
+      frontend: "Model demo UIs (Gradio/Streamlit) occasionally needed.",
+      ml:       "Must know training pipelines, evaluation, hyperparameter tuning.",
+      java:     "Rarely relevant in the Python-dominated ML ecosystem.",
+      system:   "MLOps and model serving architecture is the core of this role.",
+      cloud:    "AWS SageMaker, GCP Vertex AI, or Azure ML are daily tools.",
+      comm:     "Communicating model performance to product and business teams.",
+    },
+  },
 };
 
-const PRIORITY_META = {
-  "Critical":   { color: "#f28b8b", bg: "#2b1313", label: "Critical Gap" },
-  "High":       { color: C.amber,   bg: "#2b2013", label: "High Priority" },
-  "Medium":     { color: C.blue2,   bg: "#131a2b", label: "Medium Priority" },
-  "On target":  { color: C.green,   bg: "#132a22", label: "On Target" },
+// Hours needed to close a 10% gap (rough estimates per skill)
+const HOURS_PER_10PCT = {
+  python: 8, sql: 6, frontend: 10, ml: 12, java: 8, system: 14, cloud: 9, comm: 5,
 };
 
-function getPriority(current, target) {
-  const gap = target - current;
-  if (current >= target)    return "On target";
-  if (gap >= 40)            return "Critical";
-  if (gap >= 20)            return "High";
-  return "Medium";
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// RADAR CHART (pure SVG)
+// ─────────────────────────────────────────────────────────────────────────────
+function RadarChart({ skills, current, targets, color }) {
+  const size = 220;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r  = 80;
+  const n  = skills.length;
 
-export default function SkillGap() {
-  const navigate = useNavigate();
-  const [selectedRole, setSelectedRole] = useState(DEFAULT_ROLE);
-
-  // Merge SKILLS from mock.js + extra skills not in the list
-  const allSkills = useMemo(() => {
-    const base = SKILLS.map((s) => ({ name: s.name, pct: s.pct }));
-    const baseNames = new Set(base.map((s) => s.name));
-    const extras = EXTRA_SKILLS.filter((e) => !baseNames.has(e.name));
-    return [...base, ...extras];
-  }, []);
-
-  const roleTargets = ROLE_TARGETS[selectedRole] || ROLE_TARGETS[DEFAULT_ROLE];
-
-  const gaps = useMemo(() => {
-    return allSkills
-      .map((skill) => {
-        const aliasedName = SKILL_ALIAS[skill.name] || skill.name;
-        const [target, reason] = roleTargets[aliasedName] || [50, "Baseline competency expected."];
-        const priority = getPriority(skill.pct, target);
-        return {
-          name: skill.name,
-          current: skill.pct,
-          target,
-          priority,
-          reason,
-          tag: SKILL_TO_TAG[aliasedName] || null,
-        };
-      })
-      .sort((a, b) => {
-        const order = { Critical: 0, High: 1, Medium: 2, "On target": 3 };
-        return order[a.priority] - order[b.priority];
-      });
-  }, [allSkills, roleTargets]);
-
-  const criticalCount = gaps.filter((g) => g.priority === "Critical").length;
-  const highCount     = gaps.filter((g) => g.priority === "High").length;
-  const onTarget      = gaps.filter((g) => g.priority === "On target").length;
+  const angle  = (i) => (Math.PI * 2 * i) / n - Math.PI / 2;
+  const point  = (i, pct) => {
+    const a = angle(i);
+    const d = (pct / 100) * r;
+    return [cx + d * Math.cos(a), cy + d * Math.sin(a)];
+  };
+  const polyPts = (pcts) => pcts.map((p, i) => point(i, p).join(",")).join(" ");
+  const rings   = [20, 40, 60, 80, 100];
 
   return (
-    <div className="p-8 max-w-3xl">
-      {/* Header */}
-      <h1 className="font-display font-extrabold text-2xl mb-1" style={{ color: C.text }}>
-        Skill Gap Analysis
-      </h1>
-      <p className="text-sm mb-6" style={{ color: C.muted }}>
-        See exactly where you stand against the skills required for your target role — and jump straight to the course that closes each gap.
-      </p>
+    <svg width={size} height={size} style={{ overflow: "visible" }}>
+      {/* Grid rings */}
+      {rings.map((ring) => (
+        <polygon
+          key={ring}
+          points={skills.map((_, i) => point(i, ring).join(",")).join(" ")}
+          fill="none"
+          stroke={C.border}
+          strokeWidth="1"
+        />
+      ))}
+      {/* Axes */}
+      {skills.map((_, i) => {
+        const [x, y] = point(i, 100);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke={C.border} strokeWidth="1" />;
+      })}
+      {/* Target area */}
+      <polygon
+        points={polyPts(skills.map((s) => targets[s.id]))}
+        fill={`${color}22`}
+        stroke={color}
+        strokeWidth="1.5"
+        strokeDasharray="4 2"
+      />
+      {/* Current area */}
+      <polygon
+        points={polyPts(skills.map((s) => current[s.id]))}
+        fill={`${C.blue2}33`}
+        stroke={C.blue2}
+        strokeWidth="2"
+      />
+      {/* Dots */}
+      {skills.map((s, i) => {
+        const [x, y] = point(i, current[s.id]);
+        return <circle key={i} cx={x} cy={y} r={4} fill={C.blue2} />;
+      })}
+      {/* Labels */}
+      {skills.map((s, i) => {
+        const [x, y] = point(i, 118);
+        return (
+          <text
+            key={i}
+            x={x}
+            y={y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="9"
+            fill={C.muted}
+          >
+            {s.icon}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
 
-      {/* Role selector */}
-      <div className="rounded-2xl p-5 mb-6" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-        <p className="text-xs font-semibold mb-2" style={{ color: C.muted }}>Select your target role</p>
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+export default function SkillGap() {
+  const navigate  = useNavigate();
+  const [role, setRole]       = useState("Software Engineer (SDE)");
+  const [levels, setLevels]   = useState(
+    Object.fromEntries(ALL_SKILLS.map((s) => [s.id, s.defaultPct]))
+  );
+  const [expanded, setExpanded] = useState(null);
+  const [showRadar, setShowRadar] = useState(true);
+
+  const roleData = ROLES[role];
+
+  // Compute gap stats
+  const gaps = useMemo(() => {
+    return ALL_SKILLS.map((skill) => {
+      const current  = levels[skill.id];
+      const target   = roleData.weights[skill.id];
+      const gap      = Math.max(0, target - current);
+      const hoursNeeded = Math.round((gap / 10) * (HOURS_PER_10PCT[skill.id] || 8));
+      let priority;
+      if (current >= target)    priority = "on-target";
+      else if (gap >= 40)       priority = "critical";
+      else if (gap >= 20)       priority = "high";
+      else                      priority = "medium";
+      return { ...skill, current, target, gap, hoursNeeded, priority };
+    }).sort((a, b) => {
+      const o = { critical: 0, high: 1, medium: 2, "on-target": 3 };
+      return o[a.priority] - o[b.priority];
+    });
+  }, [levels, roleData]);
+
+  // Placement readiness score (weighted average: how close you are to target across all skills)
+  const readiness = useMemo(() => {
+    const totalWeight = Object.values(roleData.weights).reduce((a, b) => a + b, 0);
+    const score = ALL_SKILLS.reduce((acc, s) => {
+      const cur = Math.min(levels[s.id], roleData.weights[s.id]);
+      return acc + (cur / roleData.weights[s.id]) * roleData.weights[s.id];
+    }, 0);
+    return Math.round((score / totalWeight) * 100);
+  }, [levels, roleData]);
+
+  const totalHours = gaps.filter((g) => g.priority !== "on-target")
+                         .reduce((acc, g) => acc + g.hoursNeeded, 0);
+  const criticalCount = gaps.filter((g) => g.priority === "critical").length;
+  const onTargetCount = gaps.filter((g) => g.priority === "on-target").length;
+
+  const readinessColor = readiness >= 80 ? C.green : readiness >= 60 ? C.amber : C.red;
+
+  const PRIORITY = {
+    "critical":  { label: "Critical Gap",    color: "#f28b8b", bg: "#2b1313" },
+    "high":      { label: "High Priority",   color: C.amber,   bg: "#2b2013" },
+    "medium":    { label: "Medium Priority", color: C.blue2,   bg: "#131a2b" },
+    "on-target": { label: "On Target",       color: C.green,   bg: "#132a22" },
+  };
+
+  return (
+    <div className="p-6 max-w-4xl">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <h1 className="font-display font-extrabold text-2xl mb-1" style={{ color: C.text }}>
+          Skill Gap Analyzer
+        </h1>
+        <p className="text-sm" style={{ color: C.muted }}>
+          Adjust your skill levels below, pick a target role, and see exactly what to work on first.
+        </p>
+      </div>
+
+      {/* ── Role selector ───────────────────────────────────────────────── */}
+      <div className="rounded-2xl p-4 mb-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+        <p className="text-xs font-semibold mb-3" style={{ color: C.muted }}>🎯 Target Role</p>
         <div className="flex flex-wrap gap-2">
-          {Object.keys(ROLE_TARGETS).map((role) => {
-            const active = role === selectedRole;
+          {Object.entries(ROLES).map(([r, d]) => {
+            const active = r === role;
             return (
               <button
-                key={role}
-                onClick={() => setSelectedRole(role)}
-                className="text-xs font-semibold px-3 py-2 rounded-lg"
+                key={r}
+                onClick={() => setRole(r)}
+                className="text-xs font-semibold px-3 py-2 rounded-lg transition-all"
                 style={{
-                  background: active ? C.blue2 : "#1c2438",
+                  background: active ? d.color : "#1c2438",
                   color: active ? "#fff" : C.muted,
-                  border: `1px solid ${active ? C.blue2 : C.border}`,
+                  border: `1px solid ${active ? d.color : C.border}`,
                 }}
               >
-                {role}
+                {r}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Summary pills */}
-      <div className="flex gap-3 mb-6">
-        <SummaryPill color="#f28b8b" bg="#2b1313" count={criticalCount} label="Critical Gaps" />
-        <SummaryPill color={C.amber}  bg="#2b2013" count={highCount}     label="High Priority" />
-        <SummaryPill color={C.green}  bg="#132a22" count={onTarget}      label="On Target" />
+      {/* ── Dashboard row ───────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <StatCard
+          label="Placement Readiness"
+          value={`${readiness}%`}
+          color={readinessColor}
+          sub={readiness >= 80 ? "Interview ready" : readiness >= 60 ? "Getting there" : "Needs work"}
+        />
+        <StatCard label="Skills on Target"  value={`${onTargetCount}/${ALL_SKILLS.length}`} color={C.green}  sub="Already there" />
+        <StatCard label="Critical Gaps"     value={criticalCount}    color="#f28b8b" sub="Fix these first" />
+        <StatCard label="Study Hours Left"  value={`~${totalHours}h`} color={C.blue2} sub="To reach targets" />
       </div>
 
-      {/* Gap cards */}
-      <div className="space-y-3">
-        {gaps.map((gap) => {
-          const meta    = PRIORITY_META[gap.priority];
-          const gapPct  = Math.max(0, gap.target - gap.current);
-          const barPct  = Math.min(100, gap.current);
-          const tgtPct  = Math.min(100, gap.target);
+      {/* ── Two-column layout: sliders + radar ─────────────────────────── */}
+      <div className="grid lg:grid-cols-[1fr_auto] gap-5 mb-5">
 
-          return (
-            <div
-              key={gap.name}
-              className="rounded-2xl p-5"
-              style={{ background: C.card, border: `1px solid ${C.border}` }}
-            >
-              {/* Top row */}
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: C.text }}>{gap.name}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: C.muted }}>{gap.reason}</p>
+        {/* Skill sliders */}
+        <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+          <p className="text-xs font-semibold mb-4" style={{ color: C.muted }}>
+            📊 Your Current Skill Levels — drag sliders to update
+          </p>
+          <div className="space-y-4">
+            {ALL_SKILLS.map((skill) => {
+              const cur = levels[skill.id];
+              const tgt = roleData.weights[skill.id];
+              const gap = Math.max(0, tgt - cur);
+              const barColor = cur >= tgt ? C.green : gap >= 40 ? "#f28b8b" : gap >= 20 ? C.amber : C.blue2;
+              return (
+                <div key={skill.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: C.text }}>
+                      <span>{skill.icon}</span> {skill.name}
+                    </span>
+                    <div className="flex items-center gap-2 text-[11px]" style={{ color: C.muted }}>
+                      <span>Target: <b style={{ color: C.text }}>{tgt}%</b></span>
+                      <span
+                        className="font-bold px-1.5 py-0.5 rounded text-[10px]"
+                        style={{ color: barColor, background: `${barColor}22` }}
+                      >
+                        {cur}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    {/* Track */}
+                    <div className="h-2 rounded-full relative" style={{ background: "#1c2438" }}>
+                      {/* Fill */}
+                      <div
+                        className="absolute top-0 left-0 h-full rounded-full transition-all"
+                        style={{ width: `${cur}%`, background: barColor }}
+                      />
+                      {/* Target marker */}
+                      <div
+                        className="absolute top-0 h-full w-0.5"
+                        style={{ left: `${tgt}%`, background: "#ffffff55", transform: "translateX(-50%)" }}
+                      />
+                    </div>
+                    {/* Range input overlaid */}
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={cur}
+                      onChange={(e) => setLevels((prev) => ({ ...prev, [skill.id]: Number(e.target.value) }))}
+                      className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
+                      style={{ margin: 0 }}
+                    />
+                  </div>
                 </div>
-                <span
-                  className="text-[10px] font-bold px-2 py-1 rounded-md ml-3 whitespace-nowrap"
-                  style={{ background: meta.bg, color: meta.color }}
-                >
-                  {meta.label}
-                </span>
-              </div>
+              );
+            })}
+          </div>
+        </div>
 
-              {/* Progress bar */}
-              <div className="relative h-2 rounded-full mb-2" style={{ background: "#1c2438" }}>
-                {/* current */}
-                <div
-                  className="absolute top-0 left-0 h-full rounded-full"
-                  style={{ width: `${barPct}%`, background: meta.color, transition: "width 0.4s" }}
-                />
-                {/* target marker */}
-                <div
-                  className="absolute top-0 h-full w-0.5 rounded-full"
-                  style={{ left: `${tgtPct}%`, background: "#fff4", transform: "translateX(-50%)" }}
-                />
-              </div>
+        {/* Radar chart */}
+        <div
+          className="rounded-2xl p-5 flex flex-col items-center justify-center"
+          style={{ background: C.card, border: `1px solid ${C.border}`, minWidth: 260 }}
+        >
+          <p className="text-xs font-semibold mb-3 self-start" style={{ color: C.muted }}>
+            🕸️ Skill Radar
+          </p>
+          <RadarChart
+            skills={ALL_SKILLS}
+            current={levels}
+            targets={roleData.weights}
+            color={roleData.color}
+          />
+          <div className="flex gap-4 mt-3 text-[10px]" style={{ color: C.muted }}>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 rounded inline-block" style={{ background: C.blue2 }} /> You
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 rounded inline-block border-dashed" style={{ border: `1px dashed ${roleData.color}` }} /> Target
+            </span>
+          </div>
+        </div>
+      </div>
 
-              {/* Labels */}
-              <div className="flex justify-between text-[10px] mb-3" style={{ color: C.muted }}>
-                <span>You: <b style={{ color: C.text }}>{gap.current}%</b></span>
-                {gapPct > 0 && <span style={{ color: meta.color }}>Gap: {gapPct}%</span>}
-                <span>Target: <b style={{ color: C.text }}>{gap.target}%</b></span>
-              </div>
-
-              {/* CTA */}
-              {gap.priority !== "On target" && gap.tag ? (
+      {/* ── Gap cards with accordion ─────────────────────────────────────── */}
+      <div className="rounded-2xl p-5 mb-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+        <p className="text-xs font-semibold mb-4" style={{ color: C.muted }}>📋 Gap Breakdown — click any skill for details</p>
+        <div className="space-y-2">
+          {gaps.map((gap) => {
+            const meta = PRIORITY[gap.priority];
+            const open = expanded === gap.id;
+            return (
+              <div
+                key={gap.id}
+                className="rounded-xl overflow-hidden"
+                style={{ border: `1px solid ${open ? meta.color + "55" : C.border}` }}
+              >
+                {/* Row */}
                 <button
-                  onClick={() => navigate("/courses/learn", { state: { tag: gap.tag } })}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-white px-3.5 py-2 rounded-xl"
-                  style={{ background: C.blue2 }}
+                  onClick={() => setExpanded(open ? null : gap.id)}
+                  className="w-full flex items-center gap-3 p-3 text-left"
+                  style={{ background: open ? meta.bg : "#1c2438" }}
                 >
-                  Start Course <ArrowRight size={12} />
+                  <span className="text-base">{gap.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold truncate" style={{ color: C.text }}>{gap.name}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: meta.bg, color: meta.color }}>
+                        {meta.label}
+                      </span>
+                    </div>
+                    {/* Mini bar */}
+                    <div className="h-1.5 rounded-full w-48 relative" style={{ background: "#111827" }}>
+                      <div
+                        className="absolute top-0 left-0 h-full rounded-full"
+                        style={{ width: `${gap.current}%`, background: meta.color }}
+                      />
+                      <div
+                        className="absolute top-0 h-full w-px"
+                        style={{ left: `${gap.target}%`, background: "#ffffff66" }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 mr-2">
+                    <p className="text-[11px] font-bold" style={{ color: C.text }}>{gap.current}% → {gap.target}%</p>
+                    {gap.gap > 0 && (
+                      <p className="text-[10px]" style={{ color: meta.color }}>−{gap.gap}%</p>
+                    )}
+                  </div>
+                  {open ? <ChevronUp size={14} color={C.muted} /> : <ChevronDown size={14} color={C.muted} />}
                 </button>
-              ) : gap.priority === "On target" ? (
-                <div className="flex items-center gap-1.5 text-[11px]" style={{ color: C.green }}>
-                  <CheckCircle2 size={13} /> You meet the target for this role.
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+
+                {/* Accordion body */}
+                {open && (
+                  <div className="px-4 pb-4 pt-2" style={{ background: meta.bg }}>
+                    <p className="text-xs mb-3" style={{ color: C.muted, lineHeight: 1.6 }}>
+                      {roleData.tips[gap.id]}
+                    </p>
+                    <div className="flex items-center gap-4 text-[11px] mb-3" style={{ color: C.muted }}>
+                      {gap.gap > 0 && (
+                        <>
+                          <span className="flex items-center gap-1">
+                            <Clock size={11} /> ~{gap.hoursNeeded}h to close this gap
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <TrendingUp size={11} /> {gap.gap}% improvement needed
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {gap.priority !== "on-target" ? (
+                      <button
+                        onClick={() => navigate("/courses/learn", { state: { tag: gap.tag } })}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-2 rounded-lg"
+                        style={{ background: C.blue2 }}
+                      >
+                        <BookOpen size={12} /> Start {gap.name} Course <ArrowRight size={11} />
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.green }}>
+                        <CheckCircle2 size={13} /> You already meet the target for {role}.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      {/* ── Learning Roadmap ────────────────────────────────────────────── */}
+      {gaps.filter((g) => g.priority !== "on-target").length > 0 && (
+        <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+          <div className="flex items-center gap-2 mb-4">
+            <Zap size={15} color={C.amber} />
+            <p className="text-sm font-semibold" style={{ color: C.text }}>Your Recommended Learning Roadmap</p>
+          </div>
+          <div className="space-y-3">
+            {gaps
+              .filter((g) => g.priority !== "on-target")
+              .slice(0, 5)
+              .map((gap, i) => {
+                const meta = PRIORITY[gap.priority];
+                return (
+                  <div key={gap.id} className="flex items-center gap-3">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                      style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}44` }}
+                    >
+                      {i + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold" style={{ color: C.text }}>{gap.name}</p>
+                      <p className="text-[10px]" style={{ color: C.muted }}>
+                        Close {gap.gap}% gap · ~{gap.hoursNeeded}h
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => navigate("/courses/learn", { state: { tag: gap.tag } })}
+                      className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg"
+                      style={{ background: "#1c2438", color: C.blue2 }}
+                    >
+                      Start →
+                    </button>
+                  </div>
+                );
+              })}
+          </div>
+          <div
+            className="mt-4 flex items-start gap-2 text-[11px] p-3 rounded-xl"
+            style={{ background: "#1c2438", color: C.muted }}
+          >
+            <Award size={13} className="mt-0.5 shrink-0" color={C.amber} />
+            Complete all {gaps.filter((g) => g.priority !== "on-target").length} courses above ({totalHours}h total) to reach{" "}
+            <b style={{ color: C.text }}>&nbsp;placement readiness for {role}</b>.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function SummaryPill({ color, bg, count, label }) {
+function StatCard({ label, value, color, sub }) {
   return (
-    <div
-      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-      style={{ background: bg, color }}
-    >
-      <span className="text-sm font-extrabold">{count}</span> {label}
+    <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+      <p className="text-[10px] font-semibold mb-1" style={{ color: C.muted }}>{label}</p>
+      <p className="text-xl font-display font-extrabold" style={{ color }}>{value}</p>
+      <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>{sub}</p>
     </div>
   );
 }

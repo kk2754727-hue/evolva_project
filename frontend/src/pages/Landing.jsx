@@ -7,7 +7,8 @@ import {
 
 export default function Landing() {
   const navigate = useNavigate();
-  const goLogin = () => navigate("/login");
+  const goLogin    = () => navigate("/login");
+  const goRegister = () => navigate("/register");
 
   const modules = [
     { icon: FileText, title: "AI Resume Analyzer", desc: "Instant structural analysis and ATS compatibility scoring. Receive specific modular advice to optimize your resume for Tier-1 tech roles.", color: "#4f6df5" },
@@ -36,7 +37,7 @@ export default function Landing() {
         </div>
         <div className="flex items-center gap-5">
           <button onClick={goLogin} className="text-sm font-semibold" style={{ color: "#181b2e" }}>Login</button>
-          <button onClick={goLogin} className="flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2.5 rounded-xl" style={{ background: "#4338ec" }}>
+          <button onClick={goRegister} className="flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2.5 rounded-xl" style={{ background: "#4338ec" }}>
             Register <ArrowRight size={14} />
           </button>
         </div>
