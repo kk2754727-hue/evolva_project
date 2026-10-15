@@ -25,7 +25,7 @@ from speech.analysis import analyze_speech
 from auth.auth_handler import register_user, login_user
 from auth.otp_auth import create_and_send_otp, verify_otp
 from auth.user_db import (
-    get_user_by_email, update_user_profile,
+    get_user_by_email, get_user_by_id, update_user_profile,
     save_resume_result, get_resume_history, get_latest_resume,
     upsert_course_progress, get_course_progress, get_completed_courses,
     save_interview_result, get_interview_history,
