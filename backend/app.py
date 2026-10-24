@@ -1,11 +1,3 @@
-"""
-Evolva Backend API — with full SQLite student data storage
-
-Every AI result is automatically saved to the student's database record.
-New endpoints expose profile, resume history, course progress,
-interview history, and skill scores for the frontend.
-"""
-
 import base64
 import json
 import os
@@ -412,6 +404,63 @@ def complete_assessment():
         xp_earned        = data.get("xp_points", 0),
     )
     return jsonify({"success": True})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── Interview: extract resume topics ──────────────────────────────────────────
+@app.post("/api/interview/extract-topics")
+def extract_resume_topics():
+    """Resume file (PDF/DOCX) in, technical topics/projects/skills out."""
+    if "resume" not in request.files:
+        return jsonify({"error": "No file uploaded. Expected field 'resume'."}), 400
+    file = request.files["resume"]
+    if not file.filename:
+        return jsonify({"error": "Empty filename."}), 400
+    try:
+        text = extract_text(file.stream, file.filename)
+    except UnsupportedFileTypeError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Could not read file: {e}"}), 400
+    if len(text) < 30:
+        return jsonify({"error": "Couldn't extract text from this file."}), 422
+    try:
+        result = evaluator.extract_resume_topics(text)
+    except GeminiNotConfiguredError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"error": f"Topic extraction failed: {e}"}), 500
+    if "raw_response" in result:
+        return jsonify({"error": "Model returned unexpected format.", "raw": result["raw_response"]}), 502
+    return jsonify(result)
+
+
+# ── Interview: generate questions ─────────────────────────────────────────────
+@app.post("/api/interview/generate-questions")
+def generate_interview_questions():
+    """Personalised HR / technical / video interview questions via Gemini."""
+    data          = request.get_json(silent=True) or {}
+    target_role   = (data.get("target_role") or "Software Engineer").strip()
+    mode          = (data.get("mode") or "hr").strip()
+    resume_topics = data.get("resume_topics") or []
+    try:
+        num_questions = max(3, min(10, int(data.get("num_questions", 5))))
+    except (TypeError, ValueError):
+        num_questions = 5
+    try:
+        result = evaluator.generate_interview_questions(
+            mode=mode, target_role=target_role,
+            resume_topics=resume_topics, num_questions=num_questions,
+        )
+    except GeminiNotConfiguredError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"error": f"Question generation failed: {e}"}), 500
+    if "raw_response" in result:
+        return jsonify({"error": "Model returned unexpected format.", "raw": result["raw_response"]}), 502
+    return jsonify(result)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
