@@ -1,3 +1,11 @@
+"""
+Evolva Backend API — with full SQLite student data storage
+
+Every AI result is automatically saved to the student's database record.
+New endpoints expose profile, resume history, course progress,
+interview history, and skill scores for the frontend.
+"""
+
 import base64
 import json
 import os
@@ -12,7 +20,6 @@ load_dotenv()
 
 from ai.gemini_evaluator import GeminiEvaluator, GeminiNotConfiguredError
 from resume.extractor import extract_text, UnsupportedFileTypeError
-from computer_vision.computerVisionEngine import ComputerVisionEngine
 from speech.analysis import analyze_speech
 from auth.auth_handler import register_user, login_user
 from auth.otp_auth import create_and_send_otp, verify_otp
@@ -26,10 +33,20 @@ from auth.user_db import (
 )
 
 app = Flask(__name__)
-CORS(app, origins=[os.getenv('FRONTEND_URL', 'http://localhost:5173')])
+CORS(app)
 
 evaluator = GeminiEvaluator()
-cv_engine = ComputerVisionEngine()
+_cv_engine = None
+
+
+def get_cv_engine():
+    """Load MediaPipe only when the first camera frame arrives, so the rest of
+    the app (login, resume, text interviews) starts within a small memory limit."""
+    global _cv_engine
+    if _cv_engine is None:
+        from computer_vision.computerVisionEngine import ComputerVisionEngine
+        _cv_engine = ComputerVisionEngine()
+    return _cv_engine
 
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
@@ -267,7 +284,7 @@ def analyze_frame():
     except Exception as e:
         return jsonify({"error": f"Invalid image data: {e}"}), 400
     try:
-        _, scores = cv_engine.process(frame)
+        _, scores = get_cv_engine().process(frame)
     except Exception as e:
         return jsonify({"error": f"Frame analysis failed: {e}"}), 500
     return jsonify(scores)
