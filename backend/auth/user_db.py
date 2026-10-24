@@ -19,7 +19,10 @@ import sqlite3
 from datetime import datetime
 
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "evolva_users.db")
+DB_PATH = os.getenv(
+    "EVOLVA_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "evolva_users.db"),
+)
 
 
 def get_conn():
