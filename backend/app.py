@@ -26,7 +26,7 @@ from auth.user_db import (
 )
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[os.getenv('FRONTEND_URL', 'http://localhost:5173')])
 
 evaluator = GeminiEvaluator()
 cv_engine = ComputerVisionEngine()
