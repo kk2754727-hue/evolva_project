@@ -1,18 +1,10 @@
 import cv2
-import mediapipe as mp
+from computer_vision.shared_models import get_face_mesh
 from collections import deque
 
 # -----------------------------
 # MediaPipe Face Mesh
 # -----------------------------
-mp_face_mesh = mp.solutions.face_mesh
-
-face_mesh = mp_face_mesh.FaceMesh(
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
-)
 
 # Left iris landmarks
 LEFT_IRIS = [474, 475, 476, 477]
@@ -25,14 +17,14 @@ LEFT_EYE_RIGHT = 263
 history = deque(maxlen=100)
 
 
-def detect_eye_contact(frame):
+def detect_eye_contact(frame, results=None):
 
     score = 0
     direction = "NO FACE"
 
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-    results = face_mesh.process(rgb)
+    if results is None:
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = get_face_mesh().process(rgb)
 
     h, w, _ = frame.shape
 

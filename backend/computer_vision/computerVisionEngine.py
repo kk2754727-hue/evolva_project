@@ -1,3 +1,6 @@
+import cv2
+
+from computer_vision.shared_models import get_face_mesh
 from computer_vision.eye_contact import detect_eye_contact
 from computer_vision.head_pose import detect_head_pose
 
@@ -17,12 +20,16 @@ class ComputerVisionEngine:
         # -----------------------------
         # Eye Contact
         # -----------------------------
-        frame, eye_score, eye_status = detect_eye_contact(frame)
+        # One face-detection pass shared by eye contact and head pose
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        face_results = get_face_mesh().process(rgb)
+
+        frame, eye_score, eye_status = detect_eye_contact(frame, face_results)
 
         # -----------------------------
         # Head Pose
         # -----------------------------
-        frame, head_score, head_status = detect_head_pose(frame)
+        frame, head_score, head_status = detect_head_pose(frame, face_results)
 
         # -----------------------------
         # Shoulder

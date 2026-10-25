@@ -1,27 +1,19 @@
 import cv2
-import mediapipe as mp
+from computer_vision.shared_models import get_face_mesh
 
 # ----------------------------------
 # Initialize Face Mesh
 # ----------------------------------
-mp_face_mesh = mp.solutions.face_mesh
-
-face_mesh = mp_face_mesh.FaceMesh(
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
-)
 
 
-def detect_head_pose(frame):
+def detect_head_pose(frame, results=None):
 
     score = 0
     status = "NO FACE"
 
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-    results = face_mesh.process(rgb)
+    if results is None:
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = get_face_mesh().process(rgb)
 
     h, w, _ = frame.shape
 
