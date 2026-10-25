@@ -8,7 +8,7 @@ import {
   FileText, UploadCloud, Code2, Users, Gauge, X, Tag,
 } from "lucide-react";
 import { C } from "../lib/theme";
-import { evaluateAnswer, analyzeFrame } from "../lib/api";
+import { evaluateAnswer, analyzeFrame, saveInterviewSession } from "../lib/api";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const SpeechAPI = typeof window !== "undefined"
@@ -395,6 +395,25 @@ export default function MockInterview() {
     streamRef.current?.getTracks().forEach(t=>t.stop());
     streamRef.current = null;
     setPhase("done");
+
+    // Save this session to the student's interview history (database)
+    if (allResults.length > 0) {
+      const cvs = cvResults.filter(Boolean);
+      saveInterviewSession({
+        track: targetRole || "General",
+        mode,
+        scores: {
+          overall_score:       avg(allResults.map(r => r.overall_score       || 0)),
+          technical_score:     avg(allResults.map(r => r.technical_score     || 0)),
+          communication_score: avg(allResults.map(r => r.communication_score || 0)),
+          grammar_score:       avg(allResults.map(r => r.grammar_score       || 0)),
+          confidence_score:    avg(allResults.map(r => r.confidence_score    || 0)),
+          eye_score:  cvs.length ? avg(cvs.map(c => c.eye_score  || 0)) : 0,
+          body_score: cvs.length ? avg(cvs.map(c => c.body_score || 0)) : 0,
+          questions_count:     allResults.length,
+        },
+      }).catch(() => { /* history is a bonus - never block the summary screen */ });
+    }
   };
 
   // ── Speech ────────────────────────────────────────────────────────────

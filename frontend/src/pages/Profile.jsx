@@ -19,6 +19,16 @@ const BRANCHES = ["Computer Science (CSE)","Information Technology (IT)",
                   "Mechanical Engineering (ME)","Civil Engineering (CE)",
                   "Artificial Intelligence (AI)","Data Science (DS)","Other"];
 
+// SQLite stores times like "2026-10-24 13:16:05" (UTC). Turn that into a real
+// date, and return "" instead of "Invalid Date" if the value is missing/bad.
+function fmtDate(v) {
+  if (!v) return "";
+  let t = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(t)) t = t.replace(" ", "T") + "Z";
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
+}
+
 function getInitials(name) {
   if (!name) return "S";
   const p = name.trim().split(" ");
@@ -310,8 +320,7 @@ export default function Profile() {
                       <div className="min-w-0">
                         <p className="text-xs font-semibold truncate" style={{ color: C.text }}>{r.filename}</p>
                         <p className="text-[10px]" style={{ color: C.muted }}>
-                          {new Date(r.uploaded_at).toLocaleDateString()}
-                          {r.target_role && ` · ${r.target_role}`}
+                          {[fmtDate(r.uploaded_at ?? r.created_at), r.target_role].filter(Boolean).join(" · ")}
                         </p>
                       </div>
                     </div>
@@ -343,7 +352,7 @@ export default function Profile() {
                     <div>
                       <p className="text-xs font-semibold" style={{ color: C.text }}>{iv.track}</p>
                       <p className="text-[10px]" style={{ color: C.muted }}>
-                        {iv.mode} · {new Date(iv.taken_at).toLocaleDateString()}
+                        {[iv.mode, fmtDate(iv.taken_at ?? iv.created_at)].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <p className="text-sm font-display font-extrabold" style={{ color: C.purple }}>{iv.overall_score}%</p>
