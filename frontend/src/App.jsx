@@ -3,10 +3,11 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 import Landing         from "./pages/Landing";
 import Login           from "./pages/Login";
-import Register        from "./pages/register";
+import Register        from "./pages/Register";
 import AppLayout       from "./layouts/AppLayout";
 import Dashboard       from "./pages/Dashboard";
 import Courses         from "./pages/Courses";
+import CourseViewer    from "./pages/CourseViewer";
 import ResumeAnalyzer  from "./pages/ResumeAnalyzer";
 import SkillGap        from "./pages/SkillGap";
 import MockInterview   from "./pages/MockInterview";
@@ -29,6 +30,7 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="/dashboard"              element={<Dashboard />} />
         <Route path="/courses"                element={<Courses />} />
+        <Route path="/courses/learn"          element={<CourseViewer />} />
         <Route path="/resume-analyzer"        element={<ResumeAnalyzer />} />
         <Route path="/skill-gap"              element={<SkillGap />} />
         <Route path="/mock-interview"         element={<MockInterview />} />
