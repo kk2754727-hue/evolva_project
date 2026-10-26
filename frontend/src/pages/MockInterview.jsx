@@ -463,7 +463,7 @@ export default function MockInterview() {
         Mock Interview
       </h1>
       <p className="text-sm mb-6" style={{ color: C.muted }}>
-        Gemini generates personalised questions from your resume. Choose a mode, upload your resume, and start practising.
+        We generate personalised questions from your resume. Choose a mode, upload your resume, and start practising.
       </p>
 
       {/* Mode tabs */}
@@ -583,7 +583,7 @@ export default function MockInterview() {
           )}
           {!resumeFile && !extracting && (
             <p className="text-[11px] mt-3" style={{ color: C.muted }}>
-              Upload your resume so Gemini can ask about your actual projects and tech stack.
+              Upload your resume so we can ask about your actual projects and tech stack.
             </p>
           )}
 
@@ -609,7 +609,7 @@ export default function MockInterview() {
       <Loader2 size={28} className="animate-spin mb-3" color={modeConfig.color} />
       <p className="text-sm font-semibold" style={{ color: C.text }}>Generating your interview…</p>
       <p className="text-xs mt-1 text-center max-w-xs" style={{ color: C.muted }}>
-        Gemini is creating {numQuestions} {modeConfig.label.toLowerCase()} questions
+        We are creating {numQuestions} {modeConfig.label.toLowerCase()} questions
         {topics.length > 0 ? ` personalised from your resume` : ""}
         {targetRole ? ` for ${targetRole}` : ""}
       </p>
@@ -810,7 +810,7 @@ export default function MockInterview() {
           })}
           {submitting && (
             <div className="flex items-center gap-2 ml-11 text-xs" style={{ color: C.muted }}>
-              <Loader2 size={12} className="animate-spin" /> Gemini is evaluating your answer…
+              <Loader2 size={12} className="animate-spin" /> We are evaluating your answer…
             </div>
           )}
         </div>

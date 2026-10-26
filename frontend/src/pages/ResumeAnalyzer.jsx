@@ -254,7 +254,7 @@ export default function ResumeAnalyzer() {
                 style={{ background: "#1c2438", color: C.text, border: `1px solid ${C.border}` }}
               />
               <p className="text-[10px] mt-2" style={{ color: C.muted }}>
-                Helps Gemini suggest role-specific keywords you're missing.
+                Helps us suggest role-specific keywords you're missing.
               </p>
             </div>
             <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
